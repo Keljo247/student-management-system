@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <title>Login - SSU</title>
+    <link rel="stylesheet" href="style.css">
+    
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+    
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+</head>
+<body>
+    
+    <nav class="navbar">
+        <a href="index.html" class="brand">SSU Portal</a>
+        <div class="nav-links">
+        </div>
+    </nav>
+
+    <div class="form-wrapper">
+        <div class="form-box">
+            <h2>SSU Portal Login</h2>
+            <form id="loginForm">
+                <input type="email" id="email" placeholder="Email Address" required>
+                <div class="password-wrapper">
+                    <input type="password" id="password" placeholder="Password" required>
+                    <button type="button" class="toggle-password" id="togglePassword" aria-label="Toggle password visibility">
+                        <svg id="eyeIcon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                            <circle cx="12" cy="12" r="3"></circle>
+                        </svg>
+                        <svg id="eyeOffIcon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;">
+                            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                            <line x1="1" y1="1" x2="23" y2="23"></line>
+                        </svg>
+                    </button>
+                </div>
+                <button type="submit" class="submit-btn">Login</button>
+            </form>
+            <p style="text-align:center; margin-top:12px;">
+                <a href="#" id="resetPasswordLink" style="color:#1565c0; font-size:0.9rem;">Forgot Password?</a>
+            </p>
+            <p style="text-align:center; margin-top:5px;">
+                New Student? <a href="signup.html">Register here</a>
+            </p>
+        </div>
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyAn9epoCMHgljwLNRd6KoKc15YaxF0mEIM",
+            authDomain: "my-ssu-portal.firebaseapp.com",
+            projectId: "my-ssu-portal",
+            storageBucket: "my-ssu-portal.firebasestorage.app",
+            messagingSenderId: "152137753117",
+            appId: "1:152137753117:web:a25fd31d8d3269b0b71cf4"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+
+        // Password visibility toggle
+        document.getElementById('togglePassword').addEventListener('click', () => {
+            const passwordInput = document.getElementById('password');
+            const eyeIcon = document.getElementById('eyeIcon');
+            const eyeOffIcon = document.getElementById('eyeOffIcon');
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                eyeIcon.style.display = 'none';
+                eyeOffIcon.style.display = 'block';
+            } else {
+                passwordInput.type = 'password';
+                eyeIcon.style.display = 'block';
+                eyeOffIcon.style.display = 'none';
+            }
+        });
+
+        // Forgot / Reset Password
+        document.getElementById('resetPasswordLink').addEventListener('click', (e) => {
+            e.preventDefault();
+            Swal.fire({
+                title: 'Reset Password',
+                html: `<p style="margin-bottom:10px;font-size:0.95rem;color:#555;">Enter your registered email address and we'll send you a link to reset your password.</p>
+                       <input id="resetEmail" class="swal2-input" type="email" placeholder="Email Address">`,
+                icon: 'info',
+                showCancelButton: true,
+                confirmButtonText: 'Send Reset Link',
+                confirmButtonColor: '#1565c0',
+                cancelButtonText: 'Cancel',
+                focusConfirm: false,
+                preConfirm: () => {
+                    const email = document.getElementById('resetEmail').value;
+                    if (!email) {
+                        Swal.showValidationMessage('Please enter your email address.');
+                        return false;
+                    }
+                    return auth.sendPasswordResetEmail(email)
+                        .then(() => email)
+                        .catch((error) => {
+                            let msg = 'Something went wrong. Please try again.';
+                            if (error.code === 'auth/user-not-found') msg = 'No account found with this email.';
+                            if (error.code === 'auth/invalid-email') msg = 'Invalid email address.';
+                            Swal.showValidationMessage(msg);
+                        });
+                }
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    Swal.fire({
+                        icon: 'info',
+                        title: 'Reset Email Sent',
+                        html: `<p>A password reset link has been sent to <strong>${result.value}</strong>.</p><p style="margin-top:8px;color:#666;font-size:0.9rem;">Please check your inbox (and spam folder) and follow the instructions in the email.</p>`,
+                        confirmButtonColor: '#1565c0'
+                    });
+                }
+            });
+        });
+
+        document.getElementById('loginForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            auth.signInWithEmailAndPassword(email, password)
+                .then(() => {
+                    // Success Popup
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Login Successful',
+                        text: 'Welcome back! Redirecting...',
+                        timer: 1500, // Closes automatically after 1.5 seconds
+                        showConfirmButton: false
+                    }).then(() => {
+                        window.location.href = 'dashboard.html';
+                    });
+                })
+                .catch((error) => {
+                    console.error("Login Error:", error);
+                    
+                    // Specific error messages for better user experience
+                    let errorMessage = "Invalid email or password.";
+                    if (error.code === 'auth/user-not-found') errorMessage = "No account found with this email.";
+                    if (error.code === 'auth/wrong-password') errorMessage = "Incorrect password.";
+                    if (error.code === 'auth/too-many-requests') errorMessage = "Too many failed attempts. Try again later.";
+
+                    // Error Popup
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Login Failed',
+                        text: errorMessage
+                    });
+                });
+        });
+    </script>
+</body>
+</html>

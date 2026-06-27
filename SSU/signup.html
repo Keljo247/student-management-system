@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <title>Sign Up - SSU</title>
+    <link rel="stylesheet" href="style.css">
+    
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+    
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+</head>
+<body>
+
+    <nav class="navbar">
+        <a href="index.html" class="brand">SSU Portal</a>
+        <div class="nav-links">
+        </div>
+    </nav>
+
+    <div class="form-wrapper">
+        <div class="form-box">
+            <h2>Student Registration</h2>
+            <form id="signupForm">
+                <input type="text" id="fullName" placeholder="Full Name (e.g. Juan Cruz)" required>
+                <input type="text" id="studentID" placeholder="Student ID (e.g. 21-00123)" required>
+                
+                <select id="course" required>
+                    <option value="" disabled selected>Select Course</option>
+                    <option value="BA Comm">Bachelor of Arts in Communication (BA Comm)</option>
+                    <option value="BS Bio">Bachelor of Science in Biology (BS Bio)</option>
+                    <option value="BS EnvSci">Bachelor of Science in Environmental Science (BS EnvSci)</option>
+                    <option value="BS Applied Statistics">Bachelor of Science in Applied Statistics</option>
+                    <option value="BS Psych">Bachelor of Science in Psychology (BS Psych)</option>
+                    <option value="BSIT">Bachelor of Science in Information Technology (BSIT)</option>
+                </select>
+
+                <select id="yearLevel" required>
+                    <option value="" disabled selected>Select Year Level</option>
+                    <option value="1st Year">1st Year</option>
+                    <option value="2nd Year">2nd Year</option>
+                    <option value="3rd Year">3rd Year</option>
+                    <option value="4th Year">4th Year</option>
+                </select>
+
+                <input type="email" id="email" placeholder="Email Address" required>
+                <input type="password" id="password" placeholder="Password (Min 6 chars)" required>
+                
+                <button type="submit" class="submit-btn">Create Account</button>
+            </form>
+            <p style="text-align:center; margin-top:15px;">
+                Already enrolled? <a href="login.html">Login here</a>
+            </p>
+        </div>
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyAn9epoCMHgljwLNRd6KoKc15YaxF0mEIM",
+            authDomain: "my-ssu-portal.firebaseapp.com",
+            projectId: "my-ssu-portal",
+            storageBucket: "my-ssu-portal.firebasestorage.app",
+            messagingSenderId: "152137753117",
+            appId: "1:152137753117:web:a25fd31d8d3269b0b71cf4"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        document.getElementById('signupForm').addEventListener('submit', async (e) => {
+            e.preventDefault(); 
+
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const fullName = document.getElementById('fullName').value;
+            const studentID = document.getElementById('studentID').value;
+            const course = document.getElementById('course').value;
+            const yearLevel = document.getElementById('yearLevel').value;
+
+            try {
+                // --- 1. SECURITY CHECK ---
+                const allowedRef = db.collection('allowed_students').doc(studentID);
+                const docSnap = await allowedRef.get();
+
+                // Check A: Is ID in the list?
+                if (!docSnap.exists) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Access Denied',
+                        text: 'This Student ID is not found in our records. Please contact the administrator.'
+                    });
+                    return; 
+                }
+
+                // Check B: Is ID already used?
+                if (docSnap.data().isRegistered === true) {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Already Registered',
+                        text: 'This Student ID has already been registered.'
+                    });
+                    return; 
+                }
+
+                // --- 2. CREATE ACCOUNT ---
+                const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+                const user = userCredential.user;
+
+                // --- 3. SAVE STUDENT DATA ---
+                await db.collection('students').doc(user.uid).set({
+                    fullName: fullName,
+                    studentID: studentID,
+                    course: course,
+                    yearLevel: yearLevel,
+                    
+                    // UPDATED: Automatically set Section to 1B
+                    section: "Section 1B", 
+
+                    email: email,
+                    currentSemester: "2nd Semester, SY 2024-2025",
+                    grades: [] 
+                });
+
+                // --- 4. MARK ID AS REGISTERED ---
+                await allowedRef.update({
+                    isRegistered: true
+                });
+
+                // Success Popup
+                await Swal.fire({
+                    icon: 'success',
+                    title: 'Registration Successful!',
+                    text: 'Account created! Redirecting you to login...',
+                    timer: 2000,
+                    showConfirmButton: false
+                });
+                window.location.href = 'login.html';
+
+            } catch (error) {
+                console.error(error);
+                let errorMessage = "Something went wrong.";
+                
+                if (error.code === 'auth/email-already-in-use') {
+                    errorMessage = "That email is already being used.";
+                } else if (error.code === 'auth/weak-password') {
+                    errorMessage = "Password is too weak. Please use at least 6 characters.";
+                } else {
+                    errorMessage = error.message;
+                }
+
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Registration Failed',
+                    text: errorMessage
+                });
+            }
+        });
+    </script>
+</body>
+</html>

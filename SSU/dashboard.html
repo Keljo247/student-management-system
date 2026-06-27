@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <title>My Dashboard - SSU</title>
+    <link rel="stylesheet" href="style.css">
+    
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+    
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+</head>
+<body>
+
+    <nav class="navbar">
+        <span class="brand">My Account</span>
+        <div class="nav-links">
+            <span id="navName" style="margin-right:15px; font-weight:bold; display:none;">Student</span> 
+            <button onclick="logout()" class="btn-login" style="cursor:pointer; border-color: #d32f2f; color: #d32f2f;">Logout</button>
+        </div>
+    </nav>
+
+    <div class="container">
+        <h2 id="loading" style="text-align:center; color:#666; margin-top: 50px;">Verifying Student Identity...</h2>
+
+        <div id="mainContent" style="display:none;">
+            
+            <div class="card">
+                <h3>Student Information</h3>
+                <div class="info-grid">
+                    <p><strong>Full Name:</strong> <span id="displayName">...</span></p>
+                    <p><strong>Student ID:</strong> <span id="displayID">...</span></p>
+                    <p><strong>Course:</strong> <span id="displayCourse">...</span></p>
+                    <p><strong>Year Level:</strong> <span id="displayYear">...</span></p>
+                    
+                    <p><strong>Section:</strong> <span id="displaySection">...</span></p>
+
+                    <p><strong>Current Sem:</strong> <span id="displaySem">...</span></p>
+                    <p><strong>Status:</strong> <span style="color:green; font-weight:bold;">OFFICIALLY ENROLLED</span></p>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>Grades (Previous Semester)</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Subject code</th>
+                            <th>Subject Description</th>
+                            <th>Grade</th>
+                            <th>Remarks</th>
+                        </tr>
+                    </thead>
+                    <tbody id="gradesTableBody">
+                        </tbody>
+                </table>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyAn9epoCMHgljwLNRd6KoKc15YaxF0mEIM",
+            authDomain: "my-ssu-portal.firebaseapp.com",
+            projectId: "my-ssu-portal",
+            storageBucket: "my-ssu-portal.firebasestorage.app",
+            messagingSenderId: "152137753117",
+            appId: "1:152137753117:web:a25fd31d8d3269b0b71cf4"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        // CHECK IF USER IS LOGGED IN
+        auth.onAuthStateChanged((user) => {
+            if (user) {
+                // Yes, logged in. Fetch their data from 'students' collection
+                const docRef = db.collection('students').doc(user.uid);
+
+                docRef.get().then((doc) => {
+                    if (doc.exists) {
+                        const data = doc.data();
+
+                        // 1. Fill Profile Data
+                        document.getElementById('navName').textContent = data.fullName;
+                        // Show the name once loaded
+                        document.getElementById('navName').style.display = 'inline-block';
+                        
+                        document.getElementById('displayName').textContent = data.fullName;
+                        document.getElementById('displayID').textContent = data.studentID;
+                        document.getElementById('displayCourse').textContent = data.course;
+                        document.getElementById('displayYear').textContent = data.yearLevel;
+
+                        // NEW: Populate Section (Defaults to "Section 1B" if missing)
+                        document.getElementById('displaySection').textContent = data.section || "Section 1B";
+
+                        // We are forcing the text here instead of using the database
+document.getElementById('displaySem').textContent = "2nd Semester, SY 2025-2026";
+
+                        // 2. Fill Grades Table OR Show Request Button
+                        const tableBody = document.getElementById('gradesTableBody');
+                        let rows = '';
+
+                        // CHECK: Do they have grades?
+                        if (data.grades && data.grades.length > 0) {
+                            // YES: Loop through and show them
+                            data.grades.forEach(g => {
+                                const isPass = parseFloat(g.grade) <= 3.0;
+                                const remarkClass = isPass ? 'pass' : 'fail';
+                                const remarkText = isPass ? 'PASSED' : 'FAILED';
+
+                                rows += `
+                                    <tr>
+                                        <td>${g.code}</td>
+                                        <td>${g.desc}</td>
+                                        <td>${g.grade}</td>
+                                        <td class="${remarkClass}">${remarkText}</td>
+                                    </tr>
+                                `;
+                            });
+                        } else {
+                            // NO: Show the "Request my Grades" Button
+                            rows = `
+                                <tr>
+                                    <td colspan="4" style="text-align:center; padding: 30px;">
+                                        <p style="margin-bottom:15px; color:#666;">
+                                            No grades posted for this semester yet.
+                                        </p>
+                                        <button onclick="requestGrades()" style="
+                                            background-color: #28a745; 
+                                            color: white; 
+                                            padding: 10px 20px; 
+                                            border: none; 
+                                            border-radius: 5px; 
+                                            cursor: pointer;
+                                            font-size: 14px;
+                                            font-weight: bold;">
+                                            Request my Grades
+                                        </button>
+                                    </td>
+                                </tr>
+                            `;
+                        }
+
+                        tableBody.innerHTML = rows;
+
+                        // Show the content
+                        document.getElementById('loading').style.display = 'none';
+                        document.getElementById('mainContent').style.display = 'block';
+
+                    } else {
+                        console.log("No such document!");
+                    }
+                }).catch((error) => {
+                    console.log("Error getting document:", error);
+                });
+
+            } else {
+                // No, not logged in. Kick them out.
+                window.location.href = 'login.html';
+            }
+        });
+
+        // --- UPDATED FUNCTIONS ---
+
+        function requestGrades() {
+            Swal.fire({
+                icon: 'success',
+                title: 'Request Sent!',
+                text: 'The Registrar has been notified. Please check back in 24 hours for updates.',
+                confirmButtonColor: '#28a745', 
+                confirmButtonText: 'Great, thanks!'
+            });
+        }
+
+        function logout() {
+            Swal.fire({
+                title: 'Logging out...',
+                timer: 1000, // Short delay for visual effect
+                showConfirmButton: false,
+                willClose: () => {
+                    auth.signOut().then(() => {
+                        window.location.href = 'index.html';
+                    });
+                }
+            });
+        }
+    </script>
+</body>
+</html>
